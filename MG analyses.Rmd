@@ -4,6 +4,7 @@ author: "Randall Hughes"
 date: "10/12/2017"
 output: html_document
 ---
+#Updated 18 October 2017
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
