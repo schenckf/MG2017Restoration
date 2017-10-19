@@ -2,27 +2,31 @@
 title: "MA DMF Middle Ground"
 author: "Randall Hughes"
 date: "10/12/2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 #Packages
 ```{r}
 #library(dplyr)
+#library(sciplot)
 ```
 
 
 #Importing Data
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-mg = read.csv ("MG_restoration_data.csv", header=T)
+mg <- read.csv("MG_restoration_data.csv", header=T)
+mg$no.sites <- as.factor(mg$no.sites)
+str(mg)
 
 ```
 
 #Spring 2017 PLANTING 1 Month Monitoring Analyses
 ```{r}
 #Data organization
-mg.spring2017.1month <- filter(mg, planting.date == "Spring" & sample.point == "1month")
-mg.spring2017.1month$no.sites <- as.factor(mg.spring2017.1month$no.sites)
+mg.spring2017.1month <- filter(mg, mg$planting.date == "Spring" & mg$sample.point == "1month")
 str(mg.spring2017.1month)
 ```
 
@@ -211,6 +215,15 @@ plot(canopy.height ~ identity, data = mg.fall2017.1month.den.Poly3)
 
 #****************************************************************************************************************************
 
+#Restoration success: mean discs per plot
+```{r}
+#Model
+model = lm(no.discs ~ no.sites + identity + planting.date + transect:planting.date + no.sites:planting.date + identity:planting.date, data = mg)
+anova(model) # transect:planting.date and no.sites:planting.date --> significant
+
+bargraph.CI(x.factor = planting.date, response = no.discs, group = no.sites, data = mg, legend = T, x.leg = 7, y.leg =6, ylim = c(0,6)) #spring poly5s had fewer discs remaining after 1 month
+bargraph.CI(x.factor = planting.date, response = no.discs, group = transect, data = mg, legend = T, x.leg = 5.7, y.leg =6, ylim = c(0,6)) #south transect in the fall had fewer discs remaining after 1 month
+```
 
 
 
