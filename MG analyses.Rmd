@@ -60,11 +60,11 @@ plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den.Poly5)
 
 ##3poly
 ###Data management
-mg.spring2017.1month.den.Poly3 <- subset(mg.spring2017.1month.den, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Nahant" )
+mg.spring2017.1month.den.Poly3 <- subset(mg.spring2017.1month.den, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Lynn" )
 
 ###model
 model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den.Poly3)
-anova(model.3poly) #no.discs and identity --> significant, no overyielding
+anova(model.3poly) #no.discs, no.sites, and identity --> significant, no overyielding
 plot(shoots.per.disc ~ identity, data = mg.spring2017.1month.den.Poly3, ylim = c(0,15))
 plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den.Poly3, ylim = c(0,15))
 ```
@@ -77,7 +77,7 @@ anova(model)
 
 #percent cover - differences by diversity (parsed between 3 and 5), identity; number of discs as covariate; transect removed
 model = lm(percent.cover ~ no.sites + identity + no.discs, data = mg.spring2017.1month)
-anova(model) #why is identity excluded from output?
+anova(model) #why is identity excluded from output?       ##########???################
 ```
 
 ##Canopy height
@@ -110,11 +110,11 @@ plot(canopy.height ~ identity, data = mg.spring2017.1month.ch.Poly5)
 
 ##3poly
 ###Data management
-mg.spring2017.1month.ch.Poly3 <- subset(mg.spring2017.1month.ch, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Nahant" )
+mg.spring2017.1month.ch.Poly3 <- subset(mg.spring2017.1month.ch, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Lynn" )
 
 ###model
 model.3poly = lm(canopy.height ~ no.sites + identity + no.discs, data=mg.spring2017.1month.ch.Poly3)
-anova(model.3poly) # identity --> significant; no.sites(diversity) --> marginally significant; no overyielding
+anova(model.3poly) # identity and no.sites --> significant; no overyielding
 plot(canopy.height ~ no.sites, data = mg.spring2017.1month.ch.Poly3)
 plot(canopy.height ~ identity, data = mg.spring2017.1month.den.Poly3)
 ```
