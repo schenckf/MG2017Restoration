@@ -11,8 +11,8 @@ output:
 
 #Packages
 ```{r}
-#library(dplyr)
-#library(sciplot)
+library(dplyr)
+library(sciplot)
 ```
 
 
@@ -224,9 +224,20 @@ model = lm(no.discs ~ no.sites + identity + planting.date + transect:planting.da
 anova(model) # transect:planting.date and no.sites:planting.date --> significant
 
 bargraph.CI(x.factor = planting.date, response = no.discs, group = no.sites, data = mg, legend = T, x.leg = 7, y.leg =6, ylim = c(0,6)) #spring poly5s had fewer discs remaining after 1 month
+bargraph.CI(x.factor = planting.date, response = no.discs, group = identity, data = mg, legend = T, x.leg = 7, y.leg =6, ylim = c(0,6)) #spring poly5s had fewer discs remaining after 1 month
 bargraph.CI(x.factor = planting.date, response = no.discs, group = transect, data = mg, legend = T, x.leg = 5.7, y.leg =6, ylim = c(0,6)) #south transect in the fall had fewer discs remaining after 1 month
 ```
 
+#****************************************************************************************************************************
+
+#Plot Level Analyses
+```{r}
+mg.plot = mg %>%
+  group_by(planting.date, identity) %>%
+  summarize(shoot.per.plot = mean(no.shoots, na.rm = T))
+
+View(mg.plot) #Our data set matches DMFs, Hooray!
+```
 
 
 
