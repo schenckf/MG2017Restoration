@@ -41,13 +41,13 @@ mg.spring2017.1month.den <- subset(mg.spring2017.1month, no.discs > 0)
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.spring2017.1month.den)
 anova(model) #diversity, identity, no.discs --> significant
-plot(shoots.per.disc ~ diversity.treatment, data = mg.spring2017.1month.den)
+plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,25), data = mg.spring2017.1month.den)
 plot(shoots.per.disc ~ identity, data = mg.spring2017.1month.den)
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den)
 anova(model) #identity, no.discs, diversity --> significant
-plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den)
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den)
 
 #Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
 ##5poly
@@ -57,7 +57,7 @@ mg.spring2017.1month.den.Poly5 <- filter(mg.spring2017.1month.den, no.sites != "
 ###model
 model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den.Poly5)
 anova(model.5poly) #no.discs, no.sites, identity --> significant; mono > poly
-plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den.Poly5)
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den.Poly5)
 
 ##3poly
 ###Data management
@@ -65,9 +65,9 @@ mg.spring2017.1month.den.Poly3 <- subset(mg.spring2017.1month.den, identity == "
 
 ###model
 model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den.Poly3)
-anova(model.3poly) #no.discs, no.sites, and identity --> significant, no overyielding
+anova(model.3poly) #no.discs and identity --> significant, no overyielding
 plot(shoots.per.disc ~ identity, data = mg.spring2017.1month.den.Poly3, ylim = c(0,15))
-plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den.Poly3, ylim = c(0,15))
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den.Poly3)
 ```
 
 ###Percent cover
@@ -135,13 +135,13 @@ mg.spring2017.6month.den <- subset(mg.spring2017.6month, no.discs > 0)
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.spring2017.6month.den)
 anova(model) #diversity, identity, no.discs --> significant; transect marginally signficiant
-plot(shoots.per.disc ~ diversity.treatment, data = mg.spring2017.6month.den)
-plot(shoots.per.disc ~ identity, data = mg.spring2017.6month.den)
+plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,30), data = mg.spring2017.6month.den)
+plot(shoots.per.disc ~ identity, ylim = c(0,30), data = mg.spring2017.6month.den)
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.6month.den)
 anova(model) #identity, no.discs, diversity --> significant
-plot(shoots.per.disc ~ no.sites, data = mg.spring2017.1month.den)
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.6month.den)
 
 #Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
 ##5poly
@@ -151,7 +151,7 @@ mg.spring2017.6month.den.Poly5 <- filter(mg.spring2017.6month.den, no.sites != "
 ###model
 model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.6month.den.Poly5)
 anova(model.5poly) #no.discs, no.sites, identity --> significant; mono < poly
-plot(shoots.per.disc ~ no.sites, data = mg.spring2017.6month.den.Poly5)
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.6month.den.Poly5)
 
 ##3poly
 ###Data management
@@ -164,9 +164,62 @@ plot(shoots.per.disc ~ identity, data = mg.spring2017.6month.den.Poly3, ylim = c
 plot(shoots.per.disc ~ no.sites, data = mg.spring2017.6month.den.Poly3, ylim = c(0,25))
 ```
 
+###Percent cover
+```{r}
+#Percent cover - differences by transect; number of discs as covariate
+model = lm(percent.cover ~ diversity.treatment + identity + no.discs + transect , data = mg.spring2017.6month)
+anova(model)
+  ##diversity, identity, no.discs are significant
+plot(percent.cover ~ identity, data = mg.spring2017.6month, ylim = c(0,100))
+plot(percent.cover ~ diversity.treatment, data = mg.spring2017.6month, ylim = c(0,100))
 
+#percent cover - differences by diversity (parsed between 3 and 5), identity; number of discs as covariate; transect removed
+model = lm(percent.cover ~ no.sites + identity + no.discs, data = mg.spring2017.6month)
+anova(model) #no.sites and identity significant
+
+plot(percent.cover ~ no.sites, data = mg.spring2017.6month, ylim = c(0,100))
 
 #****************************************************************************************************************************
+```
+
+###Canopy height
+```{r}
+#Data management: removing data points with canopy height of 0
+mg.spring2017.6month.ch <- subset(mg.spring2017.6month, canopy.height > 0)
+
+#Model 1: by diversity and identity; number of discs as covariate (but not sure why it matters?)
+model = lm(canopy.height ~ diversity.treatment + identity + no.discs + transect , data = mg.spring2017.6month.ch)
+anova(model) #no.discs, identity --> significant
+plot(canopy.height ~ diversity.treatment, data = mg.spring2017.6month.ch)
+plot(canopy.height ~ identity, data = mg.spring2017.6month.ch)
+plot(canopy.height ~ no.discs, data = mg.spring2017.6month.ch)
+
+#Model 2: diversity (parsed between 3 and 5); transect removed
+model = lm(canopy.height ~ no.sites + identity + no.discs, data = mg.spring2017.6month.ch)
+anova(model) #identity, no.discs --> significant
+plot(canopy.height ~ no.sites, data = mg.spring2017.6month.ch)
+
+#Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
+##5poly
+###Data management
+mg.spring2017.6month.ch.Poly5 <- filter(mg.spring2017.6month.ch, no.sites != "3")
+
+###model
+model.5poly = lm(canopy.height ~ no.sites + identity + no.discs, data=mg.spring2017.6month.ch.Poly5)
+anova(model.5poly) #identity, no discs --> significant; no.sites -->marginally significant
+plot(canopy.height ~ no.sites, data = mg.spring2017.6month.ch.Poly5)
+plot(canopy.height ~ identity, data = mg.spring2017.6month.ch.Poly5)
+
+##3poly
+###Data management
+mg.spring2017.6month.ch.Poly3 <- subset(mg.spring2017.6month.ch, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Lynn" )
+
+###model
+model.3poly = lm(canopy.height ~ no.sites + identity + no.discs, data=mg.spring2017.6month.ch.Poly3)
+anova(model.3poly) #no.discs --> significant
+plot(canopy.height ~ no.sites, data = mg.spring2017.6month.ch.Poly3)
+plot(canopy.height ~ identity, data = mg.spring2017.6month.den.Poly3)
+```
 
 #FALL 2017 PLANTING
 ##1 Month Monitoring Analyses
