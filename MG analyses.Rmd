@@ -334,7 +334,7 @@ bargraph.CI(x.factor = planting.date, response = no.discs, group = transect, dat
 #Plot Level Analyses
 ```{r}
 mg.plot = mg %>%
-  group_by(planting.date, identity) %>%
+  group_by(planting.date, sample.point, identity) %>%
   summarize(shoot.per.plot = mean(no.shoots, na.rm = T))
 
 View(mg.plot) #Our data set matches DMFs, Hooray!
