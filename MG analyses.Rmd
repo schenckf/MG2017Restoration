@@ -346,6 +346,108 @@ bargraph.CI(x.factor = identity, response = no.discs, data = mg.fall2017.1month,
 bargraph.CI(x.factor = transect, response = no.discs, data = mg.fall2017.1month, legend = T, x.leg = 7, y.leg =6, ylim = c(0,6)) #spring poly5s had fewer discs remaining after 1 month
 ```
 
+##6 Month Monitoring Analysis
+```{r}
+#Data organization
+mg.fall2017.6month <- filter(mg, mg$planting.date == "Fall" & mg$sample.point == "6month")
+str(mg.fall2017.6month)
+```
+
+###Shoot density
+```{r}
+#Data management- excluding plot with no discs remaining
+mg.fall2017.6month.den <- subset(mg.fall2017.6month, no.discs > 0)
+
+#Model 1
+model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.fall2017.6month.den)
+anova(model) #identity, no.discs --> significant
+plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,20), data = mg.fall2017.6month.den)
+plot(shoots.per.disc ~ identity, ylim = c(0,15), data = mg.fall2017.6month.den)
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den, ylim = c(0,15), ylab = "shoots per disc", xlab = "site identity")
+
+#Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
+model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6month.den)
+anova(model) #identity, no.discs, diversity(no.sites) --> significant
+plot(shoots.per.disc ~ no.sites, ylim = c(0,20), data = mg.fall2017.6month.den)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den, ylim = c(0,20))
+
+#Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
+##5poly
+###Data management
+mg.fall2017.6month.den.Poly5 <- filter(mg.fall2017.6month.den, no.sites != "3")
+
+###model
+model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6month.den.Poly5)
+anova(model.5poly) #no.discs, no.sites, identity --> significant; mono < poly
+plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.fall2017.6month.den.Poly5)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly5, ylim = c(0,15), ylab = "shoots per disc", xlab = "no sites per disc")
+plot(shoots.per.disc ~ identity, data = mg.fall2017.6month.den.Poly5, ylim = c(0,25))
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly5, ylim = c(0,15), ylab = "shoots per disc", xlab = "site identity")
+
+##3poly
+###Data management
+mg.fall2017.6month.den.Poly3 <- subset(mg.fall2017.6month.den, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Nahant" )
+
+###model
+model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6month.den.Poly3)
+anova(model.3poly) #no.discs and identity --> significant
+plot(shoots.per.disc ~ identity, data = mg.fall2017.6month.den.Poly3, ylim = c(0,25))
+plot(shoots.per.disc ~ no.sites, data = mg.fall2017.6month.den.Poly3, ylim = c(0,25))
+```
+
+###Percent cover
+```{r}
+#Percent cover - differences by transect; number of discs as covariate
+model = lm(percent.cover ~ diversity.treatment + identity + no.discs + transect , data = mg.fall2017.6month)
+anova(model)    ##identity, no.discs are significant
+plot(percent.cover ~ identity, data = mg.fall2017.6month, ylim = c(0,40))
+
+#percent cover - differences by diversity (parsed between 3 and 5), identity; number of discs as covariate; transect removed
+model = lm(percent.cover ~ no.sites + identity + no.discs, data = mg.fall2017.6month)
+anova(model) #identity and no.discs significant
+
+#****************************************************************************************************************************
+```
+
+###Canopy height
+```{r}
+#Data management: removing data points with canopy height of 0
+mg.fall2017.6month.ch <- subset(mg.fall2017.6month, canopy.height > 0)
+
+#Model 1: by diversity and identity; number of discs as covariate (but not sure why it matters?)
+model = lm(canopy.height ~ diversity.treatment + identity + no.discs + transect , data = mg.fall2017.6month.ch)
+anova(model) #no.discs, identity, and transect --> significant
+plot(canopy.height ~ transect, data = mg.fall2017.6month.ch)
+plot(canopy.height ~ identity, data = mg.fall2017.6month.ch)
+plot(canopy.height ~ no.discs, data = mg.fall2017.6month.ch)
+
+#Model 2: diversity (parsed between 3 and 5); transect removed
+model = lm(canopy.height ~ no.sites + identity + no.discs, data = mg.fall2017.6month.ch)
+anova(model) #identity, no.discs --> significant
+
+#Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
+###Did not analyze because no diversity effects in models
+```
+
+###Discs per plot
+```{r}
+#Model
+model = aov(no.discs ~ no.sites + identity + transect, data = mg.fall2017.6month)
+anova(model) # transect --> significant; identity marginally significant
+
+bargraph.CI(x.factor = transect, response = no.discs, data = mg.fall2017.6month, ylim = c(0,3), ylab = "No discs per plot")
+```
+
+###Plots per grid
+```{r}
+model = aov(present ~ no.sites + identity + transect, data = mg.fall2017.6month)
+anova(model) # Identity and transect significant
+
+bargraph.CI(x.factor = identity, response = present, data = mg.fall2017.6month, ylim = c(0,1))
+bargraph.CI(x.factor = transect, response = present, data = mg.fall2017.6month, ylim = c(0,1))
+```
+
+
 #****************************************************************************************************************************
 
 #Plot Level Analyses
