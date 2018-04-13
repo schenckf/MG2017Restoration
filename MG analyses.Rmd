@@ -622,11 +622,12 @@ p <- ggplot(mg, aes(x = sample.date, y = no.shoots.3plot, fill = identity)) +
   theme_classic()
 p
 
-p <- ggplot(mg, aes(x = sample.date, y = canopy.height, fill = identity)) + 
+p <- ggplot(mg, aes(x = sample.date, y = canopy.height, fill = identity)) +
+  #geom_point(aes(colour = identity)) +
   stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = identity), position = position_dodge(5)) +
   stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(5), size = 0.5) +
   labs(x = "Date", y = "Canopy height (cm)") +
-  scale_y_continuous(breaks=seq(0,50,10), limits = c(0,50)) +
+  scale_y_continuous(breaks=seq(0,125,25), limits = c(0,125)) +
   theme_classic()
 p
 ```
@@ -711,6 +712,18 @@ bargraph.CI(x.factor = identity, response = no.discs, data = mg.post.storm, lege
 ```
 
 ##Canopy Height
+```{r}
+model.tukey  <- aov(canopy.height ~ no.sites + identity + planting.date + transect + no.sites:planting.date + identity:planting.date + transect:planting.date, data = mg.post.storm)
+anova(model.tukey)
+
+posthoc <- TukeyHSD(x=model.tukey, 'identity', conf.level=0.95)
+posthoc
+
+#Figures
+bargraph.CI(x.factor = planting.date, response = canopy.height, data = mg.post.storm, ylim = c(0,50))
+
+bargraph.CI(x.factor = identity, response = canopy.height, data = mg.post.storm, ylim = c(0,50))
+```
 
 
 
