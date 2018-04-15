@@ -45,14 +45,14 @@ mg <- mg %>%
 ##1 Month Monitoring Analyses
 ```{r}
 #Data organization
-mg.spring2017.1month <- filter(mg, mg$planting.date == "Spring" & mg$sample.point == "1month")
+mg.spring2017.1month <- filter(mg, mg$planting.date == "Spring.2017" & mg$sample.point == "1month")
 str(mg.spring2017.1month)
 ```
 
 ###Shoot density
 ```{r}
 #Data management- excluding plot with no discs remaining
-mg.spring2017.1month.den <- subset(mg.spring2017.1month, no.discs > 0)
+mg.spring2017.1month.den <- subset(mg.spring2017.1month, shoots.per.disc > 0)
 
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.spring2017.1month.den)
@@ -64,6 +64,7 @@ plot(shoots.per.disc ~ identity, data = mg.spring2017.1month.den)
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den)
 anova(model) #identity, no.discs, diversity --> significant
 plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.1month.den, ylim = c(0,20), main = "Spring 2017 1 month")
 
 #Model3: differences between mean mono and mean poly for poly 3 and poly 5 looking for overyielding
 ##5poly
@@ -74,6 +75,7 @@ mg.spring2017.1month.den.Poly5 <- filter(mg.spring2017.1month.den, no.sites != "
 model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.1month.den.Poly5)
 anova(model.5poly) #no.discs, no.sites, identity --> significant; mono > poly
 plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den.Poly5)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.1month.den.Poly5, ylim = c(0,20), main = "Spring 2017 1 month")
 
 ##3poly
 ###Data management
@@ -84,6 +86,7 @@ model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.
 anova(model.3poly) #no.discs and identity --> significant, no overyielding
 plot(shoots.per.disc ~ identity, data = mg.spring2017.1month.den.Poly3, ylim = c(0,15))
 plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.1month.den.Poly3)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.1month.den.Poly3, ylim = c(0,20), main = "Spring 2017 1 month")
 ```
 
 ###Percent cover
@@ -149,14 +152,14 @@ bargraph.CI(x.factor = identity, response = no.discs, data = mg, legend = T, x.l
 ##6 Month Monitoring Analysis
 ```{r}
 #Data organization
-mg.spring2017.6month <- filter(mg, mg$planting.date == "Spring" & mg$sample.point == "6month")
+mg.spring2017.6month <- filter(mg, mg$planting.date == "Spring.2017" & mg$sample.point == "6month")
 str(mg.spring2017.6month)
 ```
 
 ###Shoot density
 ```{r}
 #Data management- excluding plot with no discs remaining
-mg.spring2017.6month.den <- subset(mg.spring2017.6month, no.discs > 0)
+mg.spring2017.6month.den <- subset(mg.spring2017.6month, shoots.per.disc > 0)
 
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.spring2017.6month.den)
@@ -166,6 +169,7 @@ model = lm(shoots.per.disc ~ diversity.treatment + identity + transect, data = m
 anova(model) #diversity, identity, no.discs --> significant; transect marginally signficiant
 plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,30), data = mg.spring2017.6month.den)
 plot(shoots.per.disc ~ identity, ylim = c(0,30), data = mg.spring2017.6month.den)
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.spring2017.6month.den, ylim = c(0,20), main = "Spring 2017 6 month")
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.6month.den)
@@ -182,8 +186,9 @@ mg.spring2017.6month.den.Poly5 <- filter(mg.spring2017.6month.den, no.sites != "
 
 ###model
 model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.6month.den.Poly5)
-anova(model.5poly) #no.discs, no.sites, identity --> significant; mono < poly
+anova(model.5poly) #no.discs, no.sites, identity --> significant; poly < mono
 plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.spring2017.6month.den.Poly5)
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.6month.den.Poly5, ylim = c(0,20), main = "Spring 2017 6 month")
 
 ##3poly
 ###Data management
@@ -194,6 +199,7 @@ model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.
 anova(model.3poly) #no.discs --> significant, no overyielding
 plot(shoots.per.disc ~ identity, data = mg.spring2017.6month.den.Poly3, ylim = c(0,25))
 plot(shoots.per.disc ~ no.sites, data = mg.spring2017.6month.den.Poly3, ylim = c(0,25))
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.6month.den.Poly3, ylim = c(0,20), main = "Spring 2017 6 month")
 ```
 
 ###Percent cover
@@ -276,6 +282,7 @@ model = lm(shoots.per.disc ~ diversity.treatment + identity + no.discs + transec
 anova(model) #no significant factors
 plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,30), data = mg.spring2017.11month)
 plot(shoots.per.disc ~ identity, ylim = c(0,30), data = mg.spring2017.11month)
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.spring2017.11month, ylim = c(0,20), main = "Spring 2017 11 month")
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(shoots.per.disc ~ no.sites + identity + no.discs, data=mg.spring2017.11month)
@@ -292,6 +299,7 @@ model.5poly = lm(shoots.per.disc ~ no.sites + identity + no.discs, data=mg.sprin
 anova(model.5poly) #no.discs--> significant; identity -->marginally significant
 plot(shoots.per.disc ~ identity, data = mg.spring2017.11month.Poly5)
 bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.spring2017.11month.Poly5, ylim = c(0,45), ylab = "Shoots per disc", xlab = "identity")
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.11month.Poly5, ylim = c(0,20), ylab = "Shoots per disc")
 
 ##3poly
 ###Data management
@@ -302,6 +310,7 @@ model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.spring2017.
 anova(model.3poly) #identity and no.discs --> significant
 plot(shoots.per.disc ~ identity, data = mg.spring2017.11month.Poly3)
 bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.spring2017.11month.Poly3, ylim = c(0,45), ylab = "Shoots per disc", xlab = "Identity")
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.spring2017.11month.Poly3, ylim = c(0,20), ylab = "Shoots per disc")
 ```
 
 
@@ -375,7 +384,7 @@ bargraph.CI(x.factor = transect, response = no.discs, data = mg.spring2017.11mon
 ##1 Month Monitoring Analyses
 ```{r}
 #Data organization
-mg.fall2017.1month <- filter(mg, planting.date == "Fall" & sample.point == "1month")
+mg.fall2017.1month <- filter(mg, planting.date == "Fall.2017" & sample.point == "1month")
 mg.fall2017.1month$no.sites <- as.factor(mg.fall2017.1month$no.sites)
 str(mg.fall2017.1month)
 ```
@@ -393,6 +402,7 @@ model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, dat
 anova(model) #identity, no.discs --> significant
 plot(shoots.per.disc ~ diversity.treatment, data = mg.fall2017.1month.den)
 plot(shoots.per.disc ~ identity, data = mg.fall2017.1month.den)
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.1month.den, ylim = c(0,20), main = "Fall 2017 1 month")
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.1month.den)
