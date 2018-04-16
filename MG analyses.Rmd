@@ -392,7 +392,7 @@ str(mg.fall2017.1month)
 ###Shoot density
 ```{r}
 #Data management- excluding plot with no discs remaining
-mg.fall2017.1month.den <- subset(mg.fall2017.1month, no.discs > 0)
+mg.fall2017.1month.den <- subset(mg.fall2017.1month, shoots.per.disc > 0)
 
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.fall2017.1month.den)
@@ -418,6 +418,8 @@ mg.fall2017.1month.den.Poly5 <- filter(mg.fall2017.1month.den, no.sites != "3")
 model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.1month.den.Poly5)
 anova(model.5poly) #no.discs, identity --> significant; no overyielding
 
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.1month.den.Poly5, ylim = c(0,20), main = "Fall 2017 1 month")
+
 ##3poly
 ###Data management
 mg.fall2017.1month.den.Poly3 <- subset(mg.fall2017.1month.den, identity == "Niles" | identity == "Poly 3" | identity == "West" | identity == "Nahant" )
@@ -430,6 +432,8 @@ model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.1m
 anova(model.3poly) #no.discs and no.sites(diversity) --> significant, overyielding, but not transgressive overyielding
 plot(shoots.per.disc ~ no.sites, data = mg.fall2017.1month.den.Poly3, ylim = c(0,15))
 plot(shoots.per.disc ~ identity, data = mg.fall2017.1month.den.Poly3, ylim = c(0,15))
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.1month.den.Poly3, ylim = c(0,20), main = "Fall 2017 1 month")
+
 ```
 
 ###Percent cover
@@ -502,14 +506,14 @@ str(mg.fall2017.6month)
 ###Shoot density
 ```{r}
 #Data management- excluding plot with no discs remaining
-mg.fall2017.6month.den <- subset(mg.fall2017.6month, no.discs > 0)
+mg.fall2017.6month.den <- subset(mg.fall2017.6month, shoots.per.disc > 0)
 
 #Model 1
 model = lm(no.shoots ~ diversity.treatment + identity + no.discs + transect, data = mg.fall2017.6month.den)
 anova(model) #identity, no.discs --> significant
 plot(shoots.per.disc ~ diversity.treatment, ylim = c(0,20), data = mg.fall2017.6month.den)
 plot(shoots.per.disc ~ identity, ylim = c(0,15), data = mg.fall2017.6month.den)
-bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den, ylim = c(0,15), ylab = "shoots per disc", xlab = "site identity")
+bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den, ylim = c(0,20), ylab = "shoots per disc", xlab = "site identity")
 
 #Model 2: diversity (parsed between 3 and 5); number of discs as covariate; transect removed
 model = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6month.den)
@@ -529,7 +533,7 @@ model.5poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6m
 
 anova(model.5poly) #no.discs, no.sites, identity --> significant; mono < poly
 plot(shoots.per.disc ~ no.sites, ylim = c(0,25), data = mg.fall2017.6month.den.Poly5)
-bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly5, ylim = c(0,15), ylab = "shoots per disc", xlab = "no sites per disc")
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly5, ylim = c(0,20), ylab = "shoots per disc", xlab = "no sites per disc")
 plot(shoots.per.disc ~ identity, data = mg.fall2017.6month.den.Poly5, ylim = c(0,25))
 bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly5, ylim = c(0,15), ylab = "shoots per disc", xlab = "site identity")
 
@@ -541,7 +545,7 @@ mg.fall2017.6month.den.Poly3 <- subset(mg.fall2017.6month.den, identity == "Nile
 model.3poly = lm(no.shoots ~ no.sites + identity + no.discs, data=mg.fall2017.6month.den.Poly3)
 anova(model.3poly) #no.discs and identity --> significant
 bargraph.CI(x.factor = identity, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly3, ylim = c(0,15), ylab = "shoots per disc", xlab = "site identity")
-bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly3, ylim = c(0,15), ylab = "shoots per disc", xlab = "number sites per disc")
+bargraph.CI(x.factor = no.sites, response = shoots.per.disc, data = mg.fall2017.6month.den.Poly3, ylim = c(0,20), ylab = "shoots per disc", xlab = "number sites per disc")
 ```
 
 ###Percent cover
