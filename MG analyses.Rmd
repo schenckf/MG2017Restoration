@@ -34,7 +34,7 @@ mg <- read.csv("MG_restoration_data.csv", header=T)
 mg$no.sites <- as.factor(mg$no.sites)
 str(mg)
 
-mg$sample.date <- ymd(mg$sample.date)
+mg$sample.date <- as.Date(mg$sample.date, format = '%m/%d/%y')
 mg <- mg %>% 
   mutate(
     yr = year(sample.date), 
@@ -599,6 +599,8 @@ anova(model) # Identity and transect significant
 bargraph.CI(x.factor = identity, response = present, data = mg.fall2017.6month, ylim = c(0,1))
 bargraph.CI(x.factor = transect, response = present, data = mg.fall2017.6month, ylim = c(0,1))
 ```
+
+
 
 
 #****************************************************************************************************************************
