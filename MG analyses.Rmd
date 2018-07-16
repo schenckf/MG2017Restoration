@@ -741,5 +741,38 @@ bargraph.CI(x.factor = planting.date, response = canopy.height, data = mg.post.s
 bargraph.CI(x.factor = identity, response = canopy.height, data = mg.post.storm, ylim = c(0,50))
 ```
 
+#************************************************************************************************************
+
+#Site-Survey Wasting Disease Analyses
+
+##data upload
+```{r}
+sc <- read.csv("MG_sitecharacterization_data2.csv", header=T)
+```
+
+##Data management
+```{r}
+##Wasting disease analyses
+sc.wd <-sc
+
+sc.wd.leaf.prop <- sc.wd %>%
+  filter(below.sheath == 0) %>%
+  group_by(year, day.collected, month.collected, site, shoot.id) %>%
+  summarize(no.leaves = max(leaf.no), lesion.present = sum(lesion.present))
+
+sc.wd.leaf.prop$lesion.prop <- sc.wd.leaf.prop$lesion.present/sc.wd.leaf.prop$no.leaves
+```
+
+##Figures and Analyses
+```{r}
+##Wasting disease analyses
+###proportion infected
+p <- ggplot(filter(sc.wd.leaf.prop, lesion.present != 0), aes(x = month.collected, y = lesion.prop, fill = site)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
+  labs(x = "Month", y = "Proportion of leaves infected") +
+  theme_classic()
+p
+```
 
 
