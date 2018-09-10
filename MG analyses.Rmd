@@ -774,5 +774,40 @@ p <- ggplot(filter(sc.wd.leaf.prop, lesion.present != 0), aes(x = month.collecte
   theme_classic()
 p
 ```
+#*******************************
+#Fall 2018 Collection Planning (Impact Assessment)
+```{r}
+
+p <- ggplot(filter(mg, sub.site == "ILF-W" & planting.date == "Spring.2017"), aes(x = sample.date, y = no.discs, fill = identity)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = identity), position = position_dodge(5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(5), size = 0.5) +
+  labs(x = "Date", y = "number of discs per plot") +
+  theme_classic()
+p
+p <- ggplot(filter(mg, sub.site == "ILF-W" & planting.date == "Spring.2017"), aes(x = sample.date, y = shoots.per.disc, fill = identity)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = identity), position = position_dodge(5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(5), size = 0.5) +
+  labs(x = "Date", y = "number of shoots per disc") +
+  theme_classic()
+p
+
+p <- ggplot(filter(mg, sub.site == "ILF-W" & planting.date == "Spring.2017"), aes(x = sample.date, y = no.shoots.3plot, fill = identity)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = identity), position = position_dodge(5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(5), size = 0.5) +
+  labs(x = "Date", y = "number of shoots per 1m2") +
+  scale_y_continuous(breaks=seq(0,125,25), limits = c(0,125)) +
+  theme_classic()
+p
+
+#Impact_Assessment data
+
+ia.data <- mg %>%
+  filter(sub.site == "ILF-W" & planting.date =="Spring.2017" & sample.point == "14month")
+ia.data.identity.means <- ia.data %>%
+  group_by(identity) %>%
+  summarize(mean.spd = mean(shoots.per.disc, na.rm = T))
+
+
+```
 
 
