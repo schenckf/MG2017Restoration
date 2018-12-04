@@ -14,6 +14,11 @@ output:
 #data management
 library(dplyr)
 
+#analyses
+library(car)
+library(lsmeans) #post-hoc for random effects models
+library(multcomp) #Tukey tests
+
 #time series
 library(tidyverse)
 library(dplyr)
@@ -24,6 +29,7 @@ library(EnvStats)
 library(ggplot2)
 library(sciplot)
 library(multcompView)
+source("http://faraway.neu.edu/data/Rprofile") #Color blind palette
 ```
 
 
@@ -380,6 +386,282 @@ anova(model) # transect:planting.date and no.sites:planting.date --> significant
 bargraph.CI(x.factor = transect, response = no.discs, data = mg.spring2017.11month, legend = T, x.leg = 7, y.leg =6, ylim = c(0,6)) #spring poly5s had fewer discs remaining after 11 month
 ```
 
+##18 Month Disease Monitoring
+###Data upload/organization
+```{r}
+mg.disease <- read.csv("MG_disease_data_mixup?.csv", header=T) #Mixup? data is correct (switched lynn and poly5 leaves on accident)
+
+mg.disease <- mg.disease %>%
+  filter(qPCR.run != "NA")
+
+mg.disease$no.sites <- as.factor(mg.disease$no.sites)
+mg.disease$quadrat <- as.factor(mg.disease$quadrat)
+
+str(mg.disease)
+
+#changing lesions of <1% to 0 (because cannot ID as WD)
+for (n in 1:length(mg.disease$lesion.pc)) {
+  if (mg.disease$lesion.pc[n] >= 1) 
+    {mg.disease$lesion.pc[n] == mg.disease$lesion.pc
+    } else {
+      mg.disease$lesion.pc[n] = 0
+    }
+}
+for (n in 1:length(mg.disease$lesions.present)) {
+  if (mg.disease$lesion.pc[n] >= 1)
+    {mg.disease$lesions.present[n] == mg.disease$lesions.present
+    } else {
+      mg.disease$lesions.present[n] = 0
+    }
+}
+
+for (n in 1:length(mg.disease$lesions.absent)) {
+  if (mg.disease$lesion.pc[n] >= 1)
+    {mg.disease$lesions.absent[n] == mg.disease$lesions.absent
+    } else {
+      mg.disease$lesions.absent[n] = 1
+    }
+}
+
+#Excluding shoots without lesions from percent cover analyses and shoots without cells from intensity analyses
+for (n in 1:length(mg.disease$lesion.pc)) {
+  if (mg.disease$lesion.pc[n] > 0)
+    {mg.disease$lesion.pc[n] == mg.disease$lesion.pc
+    } else {
+      mg.disease$lesion.pc[n] = NA
+    }
+}
+for (n in 1:length(mg.disease$cell.per.mg)) {
+  if (mg.disease$cell.per.mg[n] > 0)
+    {mg.disease$cell.per.mg[n] == mg.disease$cell.per.mg
+    } else {
+      mg.disease$cell.per.mg[n] = NA
+    }
+}
+
+
+mg.disease.quad <- mg.disease %>%
+  filter(cells.present != "NA") %>%
+  group_by(transect, start.meter, diversity.treatment, no.sites, identity, quadrat) %>%
+  summarize(shoot.density = mean(shoot.density, na.rm = T), cells.present = sum(cells.present, na.rm = T), cells.absent = sum(cells.absent, na.rm = T), cell.per.mg = mean(cell.per.mg, na.rm = T), lesions.present = sum(lesions.present, na.rm = T), lesions.absent = sum(lesions.absent, na.rm = T), lesion.pc = mean(lesion.pc, na.rm = T), canopy.height = mean(leaf.length, na.rm = T))
+
+mg.disease.quad$no.quads.sampled <- mg.disease.quad$cells.present + mg.disease.quad$cells.absent
+
+mg.disease.quad <- mg.disease.quad %>%
+  filter(no.quads.sampled >= 4)
+
+mg.disease.quad$shoot.biomass <- mg.disease.quad$shoot.density*mg.disease.quad$canopy.height
+
+mg.disease.quad$prop.cells <- (mg.disease.quad$cells.present / (mg.disease.quad$cells.absent + mg.disease.quad$cells.present))
+
+mg.disease.quad$prop.lesions <- (mg.disease.quad$lesions.present / (mg.disease.quad$lesions.absent + mg.disease.quad$lesions.present))
+
+mg.disease.quad$identity <- factor(mg.disease.quad$identity, levels = c("lynn", "nahant", "aquavitae", "westbeach", "nilesbeach", "poly3", "poly5"))
+
+str(mg.disease.quad)
+
+
+```
+
+###Lesion Prevalence
+```{r}
+mg.3L.lesprevden.model <- glm(cbind(lesions.present, lesions.absent) ~ identity*shoot.density, family = binomial, data = mg.disease.quad)
+Anova(mg.3L.lesprevden.model, test ="LR") #Significant interaction
+
+mg.3L.lesprevden.model.figure <- lm(lesions.present /(lesions.present + lesions.absent) ~ shoot.density, data = mg.disease.quad)
+Anova(mg.3L.lesprevden.model.figure) ##use this for P values (package = car) Significant interaction
+summary(mg.3L.lesprevden.model.figure)
+
+mg.disease.quad$pred.lesden = predict(mg.3L.lesprevden.model.figure)
+
+p <- ggplot(mg.disease.quad, aes(x = shoot.density, y = lesions.present /(lesions.present + lesions.absent))) + 
+  geom_point() +
+  geom_line(aes(x = shoot.density, y = pred.lesden)) +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_classic()
+p
+
+```
+
+###Lesion percent cover
+```{r}
+mg.lpc.model <- aov(lesion.pc ~ identity, data = filter(mg.disease.quad, identity != "poly5" & identity != "poly3"))
+Anova(mg.lpc.model)
+
+plot(mg.lpc.model)
+shapiro.test(residuals(mg.lpc.model)) #pass
+leveneTest(mg.lpc.model) #pass
+
+p <- ggplot(filter(mg.disease.quad, identity != "poly5" & identity != "poly3"), aes(x = identity, y = lesion.pc, fill = identity)) +
+  stat_summary(fun.y = mean, geom = "point", aes(colour = identity), size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(0), size = 0.5) +
+  ylab("") +
+  xlab("") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2", "#999999", "#000000"), name = "Treatment", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach", "Poly 3", "Poly 5")) +
+  scale_fill_discrete(name = "Treatment", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach", "Poly 3", "Poly 5")) +
+  coord_cartesian(ylim = c(0, 25)) +
+  theme_classic()
+p
+
+p <- ggplot(mg.disease.quad, aes(x = diversity.treatment, y = lesion.pc)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0), size = 0.5) +
+  ylab("") +
+  xlab("") +
+  coord_cartesian(ylim = c(0, 25)) +
+  scale_x_discrete(labels=c("Single eelgrass source", "Multiple eelgrass sources")) +
+  theme_classic()
+p
+
+mean(mg.disease$lesion.pc, na.rm = T)
+se(mg.disease$lesion.pc, na.rm = T)
+```
+
+
+###Cell Prevalence
+```{r}
+mg.3L.prevden.model <- glm(cbind(cells.present, cells.absent) ~ identity*shoot.density, family = binomial, data = mg.disease.quad)
+Anova(mg.3L.prevden.model, test = "LR") ##use this for P values (package = car) Significant interaction
+
+mg.3L.prevden.model.figure <- lm(cells.present /(cells.present + cells.absent) ~ shoot.density, data = mg.disease.quad)
+Anova(mg.3L.prevden.model.figure)
+summary(mg.3L.prevden.model.figure)
+
+mg.disease.quad$pred = predict(mg.3L.prevden.model.figure)
+
+p <- ggplot(mg.disease.quad, aes(x = shoot.density, y = cells.present /(cells.present + cells.absent))) +
+  geom_point() +
+  geom_line(aes(x = shoot.density, y = pred)) +
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  #stat_summary(fun.y = mean, geom = "point", size = 3, aes(colour = identity), position = position_dodge(0.5)) +
+  #stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(0.5), size = 0.5) +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme_classic()
+p
+```
+
+###Cell Intensity
+```{r}
+mg.ci.model <- aov(log(cell.per.mg) ~ identity, data = mg.disease)
+Anova(mg.ci.model)
+
+plot(mg.ci.model)
+shapiro.test(residuals(mg.ci.model)) #fail (pass with log transformation)
+leveneTest(mg.ci.model) #pass
+
+p <- ggplot(mg.disease.quad, aes(x = identity, y = cell.per.mg, fill = identity)) +
+  stat_summary(fun.y = mean, geom = "point", aes(colour = identity), size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(0), size = 0.5) +
+  ylab("") +
+  xlab("") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2", "#999999", "#000000"), name = "Treatment", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach", "Poly 3", "Poly 5")) +
+  scale_fill_discrete(name = "Treatment", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach", "Poly 3", "Poly 5")) +
+  coord_cartesian(ylim = c(0, 150)) +
+  scale_x_discrete(labels=c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach", "Poly 3", "Poly 5")) +
+  theme_classic()
+p
+
+mean(mg.disease$cell.per.mg, na.rm = T)
+se(mg.disease$cell.per.mg, na.rm = T)
+```
+
+###Shoot Density
+```{r}
+mg.density.model <- aov(shoot.density ~ identity, data = mg.disease.quad)
+Anova(mg.density.model)
+
+```
+
+###Shoot length
+```{r}
+mg.length.model <- aov(leaf.length ~ identity, data = mg.disease)
+Anova(mg.length.model)
+
+p <- ggplot(mg.disease, aes(x = identity, y = leaf.length)) +
+  stat_summary(fun.y = mean, geom = "point", aes(colour = identity), size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = identity), position = position_dodge(0), size = 0.5) +
+  theme_classic()
+p
+
+plot((lesions.present/lesions.present+lesions.absent) ~ canopy.height, data = mg.disease.quad)
+```
+
+###lesion vs. qPCR
+```{r}
+plot(prop.cells ~ prop.lesions, data = mg.disease.quad)
+abline(a = 0, b = 1)
+
+```
+
+
+###Tolerance/Resistnance
+```{r}
+#Ideally entire leaf would be extracted (good to look at with bodega)
+#Maybe specific leaf area (g/cm2) is a good additional response for condition?
+
+mg.disease.tol <- read.csv("MG_disease_data_mixup?.csv", header=T) #Mixup? data is correct (switched lynn and poly5 leaves on accident)
+
+mg.disease.tol <- mg.disease.tol %>%
+  filter(qPCR.run != "NA")
+
+mg.disease.tol$no.sites <- as.factor(mg.disease.tol$no.sites)
+
+#changing lesions of <1% to 0 (because cannot ID as WD)
+for (n in 1:length(mg.disease.tol$lesion.pc)) {
+  if (mg.disease.tol$lesion.pc[n] >= 1) 
+    {mg.disease.tol$lesion.pc[n] == mg.disease.tol$lesion.pc
+    } else {
+      mg.disease.tol$lesion.pc[n] = 0
+    }
+}
+for (n in 1:length(mg.disease.tol$lesions.present)) {
+  if (mg.disease.tol$lesion.pc[n] >= 1)
+    {mg.disease.tol$lesions.present[n] == mg.disease.tol$lesions.present
+    } else {
+      mg.disease.tol$lesions.present[n] = 0
+    }
+}
+
+for (n in 1:length(mg.disease.tol$lesions.absent)) {
+  if (mg.disease.tol$lesion.pc[n] >= 1)
+    {mg.disease.tol$lesions.absent[n] == mg.disease.tol$lesions.absent
+    } else {
+      mg.disease.tol$lesions.absent[n] = 1
+    }
+}
+
+plot((100-lesion.pc) ~ cell.per.mg, data = mg.disease.tol, ylab = "proportion leaf healthy")
+abline(lm((100-lesion.pc) ~ cell.per.mg, data = filter(mg.disease.tol, identity == "aquavitae")), col = "red")
+abline(lm((100-lesion.pc) ~ cell.per.mg, data = filter(mg.disease.tol, identity == "lynn")), col = "yellow")
+abline(lm((100-lesion.pc) ~ cell.per.mg, data = filter(mg.disease.tol, identity == "westbeach")), col = "purple")
+abline(lm((100-lesion.pc) ~ cell.per.mg, data = filter(mg.disease.tol, identity == "nahant")), col = "green")
+abline(lm((100-lesion.pc) ~ cell.per.mg, data = filter(mg.disease.tol, identity == "nilesbeach")), col = "blue")
+
+
+
+mg.3L.tr.model.figure <- glm((100-lesion.pc) ~ cell.per.mg*identity, data = mg.disease.tol)
+Anova(mg.3L.tr.model.figure)
+summary(mg.3L.tr.model.figure)
+
+mg.disease.tol$pred = predict(mg.3L.tr.model.figure)
+
+p <- ggplot(mg.disease.tol, aes(x = cell.per.mg, y = 100-lesion.pc)) +
+  geom_point(aes(col = identity)) +
+  geom_line(aes(x = cell.per.mg, y = pred, col=identity)) +
+  scale_linetype_discrete(name='Transmission', labels=c('Automatic','Manual'))+
+
+  theme_classic()
+p
+
+
+```
+
+
+
 #FALL 2017 PLANTING
 ##1 Month Monitoring Analyses
 ```{r}
@@ -602,7 +884,6 @@ bargraph.CI(x.factor = transect, response = present, data = mg.fall2017.6month, 
 
 
 
-
 #****************************************************************************************************************************
 
 #Plot Level Analyses
@@ -743,37 +1024,694 @@ bargraph.CI(x.factor = identity, response = canopy.height, data = mg.post.storm,
 
 #************************************************************************************************************
 
-#Site-Survey Wasting Disease Analyses
+#Site-Survey Analyses
 
 ##data upload
 ```{r}
 sc <- read.csv("MG_sitecharacterization_data2.csv", header=T)
+
+sc.div <- read.csv("MG_scgenetic_data.csv", header=T)
+sc.div$site <- factor(sc.div$site, levels = c("Lynn", "Nahant", "Aquavitae", "Westbeach", "Nilesbeach"))
 ```
 
 ##Data management
 ```{r}
-##Wasting disease analyses
+##Plant morphology
+###Per shoot- length & leaf number
+sc.pspm <- sc %>%
+  filter(year == "2017") %>%
+  #filter(below.sheath != "1") %>%
+  filter(shoot.length != "NA") %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(shoot.length.cm = max(shoot.length, na.rm = T), no.leaves = max(leaf.no))
+
+
+##Wasting disease lesion analyses
 sc.wd <-sc
 
+#changing lesions of <1% to 0 (because cannot ID as WD)
+for (n in 1:length(sc.wd$lesion.pc)) {
+  if (sc.wd$lesion.pc[n] >= 1)
+    {sc.wd$lesion.pc[n] == sc.wd$lesion.pc
+    } else {
+      sc.wd$lesion.pc[n] = 0
+    }
+}
+for (n in 1:length(sc.wd$lesion.present)) {
+  if (sc.wd$lesion.pc[n] >= 1)
+    {sc.wd$lesion.present[n] == sc.wd$lesion.present
+    } else {
+      sc.wd$lesion.present[n] = 0
+    }
+}
+
+
 sc.wd.leaf.prop <- sc.wd %>%
+  filter(year == "2017") %>%
   filter(below.sheath == 0) %>%
-  group_by(year, day.collected, month.collected, site, shoot.id) %>%
+  group_by(year, day.collected, month.processed, site, shoot.id) %>%
   summarize(no.leaves = max(leaf.no), lesion.present = sum(lesion.present))
 
 sc.wd.leaf.prop$lesion.prop <- sc.wd.leaf.prop$lesion.present/sc.wd.leaf.prop$no.leaves
+
+sc.wd.leaf.prop$shoot.prop <- 0
+for (n in 1:length(sc.wd.leaf.prop$shoot.prop)) {
+  if (sc.wd.leaf.prop$lesion.present[n] >= 1)
+    {sc.wd.leaf.prop$shoot.prop[n] = 1
+    } else {
+      sc.wd.leaf.prop$shoot.prop[n] = 0
+    }
+}
+
+##Wasting disease qpcr analyses
+sc.qpcr <- sc.wd %>%
+  filter(tissue.sample == "1") %>%
+  filter(year != "2018") %>%
+  filter(qpcr.cells.present >= 0)
+
+##Wasting disease qpcr histogram data
+sc.qpcr.sp2017 <- sc.qpcr %>%
+  filter(qpcr.cells.present > 0) %>%
+  filter(month.processed == "may")
+
+sc.qpcr.sp2017.wb <- sc.qpcr.sp2017 %>%
+  filter(site == "westbeach")
+sc.qpcr.sp2017.nht <- sc.qpcr.sp2017 %>%
+  filter(site == "nahant")
+sc.qpcr.sp2017.nb <- sc.qpcr.sp2017 %>%
+  filter(site == "nilesbeach")
+sc.qpcr.sp2017.aq <- sc.qpcr.sp2017 %>%
+  filter(site == "aquavitae")
+sc.qpcr.sp2017.ly <- sc.qpcr.sp2017 %>%
+  filter(site == "lynn")
+
+sc.qpcr.fa2017 <- sc.qpcr %>%
+  filter(qpcr.cells.present > 0) %>%
+  filter(month.processed == "september")
+sc.qpcr.fa2017.wb <- sc.qpcr.fa2017 %>%
+  filter(site == "westbeach")
+sc.qpcr.fa2017.nht <- sc.qpcr.fa2017 %>%
+  filter(site == "nahant")
+sc.qpcr.fa2017.nb <- sc.qpcr.fa2017 %>%
+  filter(site == "nilesbeach")
+sc.qpcr.fa2017.aq <- sc.qpcr.fa2017 %>%
+  filter(site == "aquavitae")
+sc.qpcr.fa2017.ly <- sc.qpcr.fa2017 %>%
+  filter(site == "lynn")
+
 ```
 
 ##Figures and Analyses
+###plant morphology
+####Per shoot- length
 ```{r}
-##Wasting disease analyses
-###proportion infected
-p <- ggplot(filter(sc.wd.leaf.prop, lesion.present != 0), aes(x = month.collected, y = lesion.prop, fill = site)) + 
-  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
-  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
-  labs(x = "Month", y = "Proportion of leaves infected") +
+
+##Data management
+sc.length <- sc %>%
+  filter(year == "2017") %>%
+  filter(shoot.length != "NA") %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(shoot.length.cm = max(shoot.length, na.rm = T))
+
+sc.length$site <- factor(sc.length$site, levels = c("lynn", "nahant", "aquavitae", "westbeach", "nilesbeach"))
+
+str(sc.length)
+
+##histograms
+p <- ggplot(data=filter(sc.length, site =="lynn" & month.processed == "september"), aes(shoot.length.cm)) + geom_histogram()
+p
+
+sc.length.model <- aov(shoot.length.cm ~ site*month.processed, data = sc.length)
+ANOVA = Anova(sc.length.model) #Significant interaction
+ANOVA
+
+plot(sc.length.model)
+shapiro.test(residuals(sc.length.model)) #failed
+leveneTest(sc.length.model) #failed
+
+posthoc.length <- TukeyHSD(sc.length.model)
+posthoc.length
+multcompLetters(posthoc.length$`site:month.processed`[,"p adj"])
+
+mycols <- cb[c("pink", "green", "red", "orange", "blue", "grey", "black")]
+mycols
+
+p <- ggplot(sc.length, aes(x = month.processed, y = shoot.length.cm, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, position = position_dodge(0.5), aes(colour = site)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0.5), size = 0.5, aes(colour = site)) +
+  ylab("Shoot length (cm)") +
+  xlab("Month") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 115)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017"), name = "Planting Effort") +
   theme_classic()
 p
 ```
+
+####Per shoot number of leaves
+```{r}
+##Data management
+sc.leaves <- sc %>%
+  filter(year == "2017") %>%
+  filter(below.sheath != "NA") %>%
+  filter(below.sheath != "1") %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(no.leaves = max(leaf.no))
+
+sc.leaves$site <- factor(sc.leaves$site, levels = c("lynn", "nahant", "aquavitae", "westbeach", "nilesbeach"))
+
+##histograms
+p <- ggplot(data=filter(sc.leaves, site =="aquavitae" & month.processed == "may"), aes(no.leaves)) + geom_histogram()
+p
+
+sc.leaves.model <- aov(no.leaves ~ site*month.processed, data = sc.leaves)
+Anova(sc.leaves.model) #Significant interaction
+
+plot(sc.leaves.model)
+shapiro.test(residuals(sc.leaves.model)) #failed
+leveneTest(sc.leaves.model) #failed
+
+posthoc.leaves <- TukeyHSD(sc.leaves.model)
+posthoc.leaves
+multcompLetters(posthoc.leaves$`site:month.processed`[,"p adj"])
+
+
+p <- ggplot(sc.leaves, aes(x = month.processed, y = no.leaves, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  ylab("Number of leaves per shoot") +
+  xlab("Planting Effort") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 5)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic() 
+p
+```
+
+####Per Shoot grazing
+```{r}
+sc.per.shoot.grazing <- sc %>%
+  filter(year == "2017") %>%
+  filter(below.sheath != "NA") %>%
+  filter(below.sheath != "1") %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(grazing.scar.pc = max(grazing.scar.pc, na.rm = T))
+
+sc.per.shoot.grazing$site <- factor(sc.per.shoot.grazing$site, levels = c("lynn", "nahant", "aquavitae", "westbeach", "nilesbeach"))
+
+sc.per.shoot.grazing$sqrt.psg <- sqrt(sc.per.shoot.grazing$grazing.scar.pc)
+
+sc.psgrazing.model <- aov(sqrt.psg ~ site*month.processed, data = sc.per.shoot.grazing)
+Anova(sc.psgrazing.model) #Significant interaction
+
+plot(sc.psgrazing.model)
+shapiro.test(residuals(sc.psgrazing.model)) #failed
+leveneTest(sc.psgrazing.model) #failed
+
+posthoc.psgrazing <- TukeyHSD(sc.psgrazing.model)
+posthoc.psgrazing
+multcompLetters(posthoc.psgrazing$`site:month.processed`[,"p adj"])
+
+
+p <- ggplot(sc.per.shoot.grazing, aes(x = month.processed, y = grazing.scar.pc, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  ylab("Grazing Scar Index") +
+  xlab("Planting Effort") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 100)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic()
+p
+
+```
+
+####Per shoot lesion prevalence/WI/WSWI
+```{r}
+##DATA MANAGEMENT
+sc.per.shoot.lesprev <- sc %>%
+  filter(year == "2017") %>%
+  filter(below.sheath != "NA") %>%
+  filter(below.sheath != "1") %>%
+  group_by(year, month.processed, site, shoot.id, leaf.no) %>%
+  summarize(lesion.pc = mean(lesion.pc), lesion.present = mean(lesion.present))
+
+#changing lesions of <1% to 0 (because cannot ID as WD)
+for (n in 1:length(sc.per.shoot.lesprev$lesion.pc)) {
+  if (sc.per.shoot.lesprev$lesion.pc[n] >= 1)
+    {sc.per.shoot.lesprev$lesion.pc[n] == sc.per.shoot.lesprev$lesion.pc
+    } else {
+      sc.per.shoot.lesprev$lesion.pc[n] = 0
+    }
+}
+for (n in 1:length(sc.per.shoot.lesprev$lesion.present)) {
+  if (sc.per.shoot.lesprev$lesion.pc[n] >= 1)
+    {sc.per.shoot.lesprev$lesion.present[n] == sc.per.shoot.lesprev$lesion.present
+    } else {
+      sc.per.shoot.lesprev$lesion.present[n] = 0
+    }
+}
+
+sc.per.shoot.lesprev2 <- sc.per.shoot.lesprev %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(WI = max(lesion.pc), WSWI = mean(lesion.pc), lesion.pres = sum(lesion.present), lesion.abs = max(leaf.no) - sum(lesion.present), lesion.present.shoot = max(lesion.present))
+
+sc.per.shoot.lesprev2$site <- factor(sc.per.shoot.lesprev2$site, levels = c("lynn", "nahant", "aquavitae", "westbeach", "nilesbeach"))
+
+sc.per.shoot.lesprev2$sqrt.WI <- sqrt(sc.per.shoot.lesprev2$WI)
+sc.per.shoot.lesprev2$sqrt.WSWI <- sqrt(sc.per.shoot.lesprev2$WSWI)
+sc.per.shoot.lesprev2$lesion.absent.shoot <- 1 - sc.per.shoot.lesprev2$lesion.present.shoot
+
+##WI
+sc.wi.model <- aov(sqrt.WI ~ site*month.processed, data = sc.per.shoot.lesprev2)
+Anova(sc.wi.model) #Significant interaction
+
+plot(sc.wi.model)
+shapiro.test(residuals(sc.wi.model)) #failed
+leveneTest(sc.wi.model) #failed
+
+posthoc.wi <- TukeyHSD(sc.wi.model)
+posthoc.wi
+multcompLetters(posthoc.wi$`site:month.processed`[,"p adj"])
+
+
+p <- ggplot(sc.per.shoot.lesprev2, aes(x = month.processed, y = WI, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  xlab("Planting Effort") +
+  ylab("Wasting Index") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 6)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic()
+p
+
+##WSWI
+sc.wswi.model <- aov(sqrt.WSWI ~ site*month.processed, data = sc.per.shoot.lesprev2)
+Anova(sc.wswi.model) #Significant interaction
+
+plot(sc.wswi.model)
+shapiro.test(residuals(sc.wswi.model)) #failed
+leveneTest(sc.wswi.model) #pass
+
+posthoc.wswi <- TukeyHSD(sc.wswi.model)
+posthoc.wswi
+multcompLetters(posthoc.wswi$`site:month.processed`[,"p adj"])
+
+
+p <- ggplot(sc.per.shoot.lesprev2, aes(x = month.processed, y = WSWI, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
+  theme_classic()
+p
+
+##Lesion Percent Cover (WI only infect plants)
+sc.lpc.model <- aov(WI ~ site*month.processed, data = filter( sc.per.shoot.lesprev2, lesion.pres != 0))
+Anova(sc.lpc.model) # Marginally Significant interaction
+
+shapiro.test(residuals(sc.lpc.model)) #failed
+leveneTest(sc.lpc.model) #pass
+
+p <- ggplot(filter(sc.per.shoot.lesprev2, lesion.pres != 0), aes(x = month.processed, y = WI, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  ylab("Lesion percent cover") +
+  xlab("Month")+
+  theme_classic()
+p
+
+
+##prop leaves with lesions
+sc.leaf.prev.model <- glm(cbind(lesion.pres, lesion.abs) ~ site*month.processed, family = binomial, data = sc.per.shoot.lesprev2)
+anova(sc.leaf.prev.model, test = "LR") #significant interaction
+Anova(sc.leaf.prev.model, test = "LR") ##use this for P values (package = car)
+
+p <- ggplot(sc.per.shoot.lesprev2, aes(x = month.processed, y = lesion.pres/(lesion.pres + lesion.abs), fill = site)) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  labs(x = "Source Site", y = "Proportion seagrass leaves infected per plant") +
+  ylim(0,1) +
+  theme_classic()
+p
+
+#prop shoots with lesions
+sc.shoot.prev.model <- glm(cbind(lesion.present.shoot, lesion.absent.shoot) ~ site*month.processed, family = binomial, data = sc.per.shoot.lesprev2)
+Anova(sc.shoot.prev.model, test = "LR") ##use this for P values (package = car) Significant interaction
+
+leastsquares2 = lsmeans::lsmeans(sc.shoot.prev.model,
+                                 pairwise ~ site:month.processed,
+                                 adjust = "tukey")
+leastsquares2$contrasts
+lsmeans::cld(leastsquares2,
+             alpha = 0.05,
+             type = "response",
+             Letters = letters,
+             adjust = "tukey")
+
+p <- ggplot(sc.per.shoot.lesprev2, aes(x = month.processed, y = lesion.present.shoot/(lesion.present.shoot + lesion.absent.shoot), fill = site)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 3, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  labs(x = "Planting Effort", y = "Proportion of shoots with lesions") +
+  ylim(0,1) +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic()
+p
+
+```
+
+
+
+####Per leaf length
+```{r}
+##Data management
+sc.perleaf <- sc %>%
+  filter(year == "2017") %>%
+  filter(broken.tip != "1") %>%
+  filter(below.sheath != "NA") %>%
+  filter(below.sheath != "1") %>%
+  group_by(year, month.processed, site, shoot.id, leaf.no) %>%
+  summarize(leaf.length = mean(leaf.length, na.rm = T))
+
+sc.perleaf$leaf.no <- as.factor(sc.perleaf$leaf.no)
+str(sc.perleaf)
+
+sc.leaflength.model <- aov(leaf.length ~ leaf.no*site*month.processed, data = sc.perleaf)
+Anova(sc.leaflength.model) #Significant 3-way interaction
+
+shapiro.test(residuals(sc.leaflength.model)) #failed
+leveneTest(sc.leaflength.model) #failed
+
+p <- ggplot(filter(sc.perleaf, month.processed == "may"), aes(x = leaf.no, y = leaf.length, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
+  theme_classic()
+p
+```
+
+####Per Leaf Grazing scar percent cover
+```{r}
+##Data management
+sc.grazing <- sc %>%
+  filter(year == "2017") %>%
+  filter(below.sheath != "NA") %>%
+  filter(below.sheath != "1") %>%
+  group_by(year, month.processed, site, shoot.id, leaf.no) %>%
+  summarize(grazing.scar.pc = mean(grazing.scar.pc, na.rm = T))
+
+sc.grazing$leaf.no <- as.factor(sc.grazing$leaf.no)
+str(sc.grazing)
+sc.grazing$sqrt.gsp <- sqrt(sc.grazing$grazing.scar.pc)
+
+sc.grazing.model <- aov(grazing.scar.pc ~ leaf.no*site*month.processed, data = sc.grazing)
+Anova(sc.grazing.model) #Significant 3-way interaction
+
+plot(sc.grazing.model)
+shapiro.test(residuals(sc.grazing.model)) #failed
+leveneTest(sc.grazing.model) #failed
+
+p <- ggplot(filter(sc.grazing, month.processed == "september"), aes(x = leaf.no, y = grazing.scar.pc, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
+  theme_classic()
+p
+```
+
+
+####3rd leaf disease
+```{r}
+##DATA MANAGEMENT
+sc.3L.lesprev <- sc %>%
+  filter(year == "2017") %>%
+  filter(leaf.no == "3") %>%
+  group_by(year, month.processed, site, shoot.id) %>%
+  summarize(lesion.pc = mean(lesion.pc), lesion.present = mean(lesion.present), qpcr.cells.present = mean(qpcr.cells.present), qpcr.cell.mg = mean(qpcr.cell.mg))  
+
+#changing lesions of <1% to 0 (because cannot ID as WD)
+for (n in 1:length(sc.3L.lesprev$lesion.pc)) {
+  if (sc.3L.lesprev$lesion.pc[n] >= 1)
+    {sc.3L.lesprev$lesion.pc[n] == sc.3L.lesprev$lesion.pc
+    } else {
+      sc.3L.lesprev$lesion.pc[n] = 0
+    }
+}
+for (n in 1:length(sc.3L.lesprev$lesion.present)) {
+  if (sc.3L.lesprev$lesion.pc[n] >= 1)
+    {sc.3L.lesprev$lesion.present[n] == sc.3L.lesprev$lesion.present
+    } else {
+      sc.3L.lesprev$lesion.present[n] = 0
+    }
+}
+
+sc.3L.lesprev$lesion.absent <- 1 - sc.3L.lesprev$lesion.present
+sc.3L.lesprev$qpcr.cells.absent <- 1 - sc.3L.lesprev$qpcr.cells.present
+sc.3L.lesprev$sqrt.lpc <- sqrt(sc.3L.lesprev$lesion.pc)
+sc.3L.lesprev$log.qpcr.cell.mg <- log(sc.3L.lesprev$qpcr.cell.mg)
+
+###prop 3rd leaves with lesions
+sc.3L.lesprev.model <- glm(cbind(lesion.present, lesion.absent) ~ site*month.processed, family = binomial, data = sc.3L.lesprev)
+Anova(sc.3L.lesprev.model, test = "LR") ##use this for P values (package = car) Main Effects of site and month (marginal interaction)
+
+leastsquares2 = lsmeans::lsmeans(sc.3L.lesprev.model,
+                                 pairwise ~ site,
+                                 adjust = "tukey")
+leastsquares2$contrasts
+lsmeans::cld(leastsquares2,
+             alpha = 0.05,
+             type = "response",
+             Letters = letters,
+             adjust = "tukey")
+
+p <- ggplot(sc.3L.lesprev, aes(x = month.processed, y = lesion.present/(lesion.present + lesion.absent), fill = site)) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, aes(colour = site), position = position_dodge(0.05)) +
+  labs(x = "Source Site", y = "Proportion 3rd with lesions") +
+  ylim(0,1) +
+  theme_classic()
+p
+
+p <- ggplot(sc.3L.lesprev, aes(x = month.processed, y = lesion.present/(lesion.present + lesion.absent))) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, position = position_dodge(0)) +
+  labs(x = "Month", y = "Proportion 3rd leaf with lesions") +
+  ylim(0,1) +
+  theme_classic()
+p
+
+p <- ggplot(sc.3L.lesprev, aes(x = site, y = lesion.present/(lesion.present + lesion.absent))) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, position = position_dodge(0)) +
+  labs(x = "Source Site", y = "Proportion 3rd leaf with lesions") +
+  ylim(0,1) +
+  theme_classic()
+p
+
+
+
+###Lesion percent cover of 3rd leaf
+sc.3Lpc.model <- aov(sqrt.lpc ~ site*month.processed, data = filter(sc.3L.lesprev, lesion.present == "1"))
+Anova(sc.3Lpc.model) #Significant main effects of site and month processed (all driven by prevalence when remove 0's no significant differences)
+
+plot(sc.3Lpc.model)
+shapiro.test(residuals(sc.3Lpc.model)) #failed
+leveneTest(sc.3Lpc.model) #failed
+
+posthoc.3Lpc <- TukeyHSD(sc.3Lpc.model)
+posthoc.3Lpc
+multcompLetters(posthoc.3Lpc$site[,"p adj"])
+
+
+p <- ggplot(filter(sc.3L.lesprev, lesion.present == "1"), aes(x = month.processed, y = sqrt.lpc, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  theme_classic()
+p
+
+p <- ggplot(sc.3L.lesprev, aes(x = site, y = sqrt.lpc)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0), size = 0.5) +
+  theme_classic()
+p
+
+
+###prop 3rd leaf with laby cells
+sc.3L.celprev.model <- glm(cbind(qpcr.cells.present, qpcr.cells.absent) ~ site*month.processed, family = binomial, data = sc.3L.lesprev) #filter(sc.3L.lesprev, qpcr.cell.mg < 500)
+Anova(sc.3L.celprev.model, test = "LR") ##use this for P values (package = car) Main Effect of month (marginal interaction)
+
+p <- ggplot(sc.3L.lesprev, aes(x = month.processed, y = qpcr.cells.present /(qpcr.cells.present + qpcr.cells.absent), fill = site)) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, aes(colour = site), position = position_dodge(0.5)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.5), size = 0.5) +
+  labs(x = "Planting Effort", y = "Proportion shoots with L. zosterae cells") +
+  ylim(0,1) +
+  theme_classic()
+p
+
+p <- ggplot(sc.3L.lesprev, aes(x = month.processed, y = lesion.present/(lesion.present + lesion.absent))) + 
+  #scale_fill_manual(values = c("white", "gray")) +
+  #geom_boxplot(position = position_dodge(1)) +
+  #geom_dotplot(binaxis = 'y', stackdir = 'center', position = position_dodge(1), dotsize  = 0.5) +
+  stat_summary(fun.y = mean, geom = "point", size = 3, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0), size = 0.5) +
+  labs(x = "", y = "") +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic()
+p
+
+###3rd leaf Laby cell intensity
+#Non-parametric Kruskal-Wallace Test
+sc.3L.lesprev$month.site <- paste(sc.3L.lesprev$month.processed, sc.3L.lesprev$site, sep = ".")
+sc.3L.lesprev$month.site <- as.factor(sc.3L.lesprev$month.site)
+  ##Month
+kruskal.test(qpcr.cell.mg ~ month.processed, data = filter(sc.3L.lesprev, qpcr.cells.present == "1"& qpcr.cell.mg < 500)) #Not significant
+  ##Site
+kruskal.test(qpcr.cell.mg ~ site, data = filter(sc.3L.lesprev, qpcr.cells.present == "1"& qpcr.cell.mg < 500)) #not significant
+  ##Month*Site
+kruskal.test(qpcr.cell.mg ~ month.site, data = filter(sc.3L.lesprev, qpcr.cells.present == "1"& qpcr.cell.mg < 500)) #not significant :(
+
+sc.3cellintensity.model <- aov(log.qpcr.cell.mg ~ site*month.processed, data = filter(sc.3L.lesprev, qpcr.cells.present == "1" & qpcr.cell.mg < 500))
+Anova(sc.3cellintensity.model)
+
+plot(sc.3cellintensity.model)
+shapiro.test(residuals(sc.3cellintensity.model)) #pass
+leveneTest(sc.3cellintensity.model) #pass
+
+
+p <- ggplot(filter(sc.3L.lesprev, qpcr.cells.present == "1"& qpcr.cell.mg < 500), aes(x = month.processed, y = qpcr.cell.mg)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0), size = 0.5) +
+  labs(x = "Planting Effort", y = "Number of L. zosterae cells per mg eelgrass tisue") +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+   coord_cartesian(ylim = c(0, 75)) +
+  theme_classic()
+p
+
+p <- ggplot(filter(sc.3L.lesprev, qpcr.cells.present == "1"), aes(x = site, y = log.qpcr.cell.mg)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, position = position_dodge(0)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", position = position_dodge(0), size = 0.5) +
+  theme_classic()
+p
+
+p <- ggplot(filter(sc.3L.lesprev, qpcr.cells.present == "1" & qpcr.cell.mg < 500), aes(x = month.processed, y = log.qpcr.cell.mg, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.25)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(0.25), size = 0.5) +
+  theme_classic()
+p
+
+##histograms (really not that helpful)
+p <- ggplot(data=filter(sc.3L.lesprev, site =="nilesbeach" & qpcr.cells.present == "1"), aes(qpcr.cell.mg)) + geom_histogram(binwidth = 100)
+p
+
+
+##If cut out any samples with cells counts >500 significant effects of season and the interaction of season and source site on cell counts for KW test (only signficant effect of season for ANOVA of log cell counts). Excluding counts over 500 does not change prevalence results.
+```
+
+
+
+
+###WD lesion analyses
+####proportion leaves with lesions/shoot
+```{r}
+##Wasting disease lesion analyses
+###proportion leaves with lesions/shoot
+p <- ggplot(filter(sc.wd.leaf.prop, lesion.present != 0), aes(x = month.processed, y = lesion.prop, fill = site)) + 
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(colour = site), position = position_dodge(1), size = 0.5) +
+  labs(x = "Month", y = "Proportion of leaves infected/shoot") +
+  theme_classic()
+p
+```
+####proportion of shoots with lesions
+```{r}
+p <- ggplot(sc.wd.leaf.prop, aes(x = month.processed, y = shoot.prop, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  labs(x = "Month", y = "Proportion of shoots with lesions") +
+  theme_classic()
+p
+```
+####proportion of 3rd leaves with lesions
+```{r}
+p <- ggplot(filter(sc.wd, leaf.no == "3"), aes(x = month.processed, y = lesion.present, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  labs(x = "Month", y = "Proportion of 3rd leaf with lesions") +
+  theme_classic()
+p
+
+```
+
+###WD qPCR analyses
+####proportion 3rd leaf infected
+```{r}
+p <- ggplot(sc.qpcr, aes(x = month.processed, y = qpcr.cells.present, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(1)) +
+  labs(x = "Month", y = "Proportion of 3rd leaves qPCR +") +
+  theme_classic()
+p
+```
+####laby cells/mg histograms by site
+```{r}
+par(mfrow=c(3,2))
+hist(sc.qpcr.sp2017.nht$qpcr.cell.mg)
+hist(sc.qpcr.sp2017.ly$qpcr.cell.mg)
+hist(sc.qpcr.sp2017.wb$qpcr.cell.mg)
+hist(sc.qpcr.sp2017.aq$qpcr.cell.mg)
+hist(sc.qpcr.sp2017.nb$qpcr.cell.mg)
+
+par(mfrow=c(3,2))
+hist(sc.qpcr.fa2017.nht$qpcr.cell.mg)
+hist(sc.qpcr.fa2017.ly$qpcr.cell.mg)
+hist(sc.qpcr.fa2017.wb$qpcr.cell.mg)
+hist(sc.qpcr.fa2017.aq$qpcr.cell.mg)
+hist(sc.qpcr.fa2017.nb$qpcr.cell.mg)
+
+```
+###Genotypic/Allelic Diversity
+```{r}
+#Simpson's Diversity Index (div)
+p <- ggplot(sc.div, aes(x = month, y = div, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  ylab("") +
+  xlab("") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic() 
+p
+
+#Shannon-Wiener Index
+p <- ggplot(sc.div, aes(x = month, y = shu, fill = site)) +
+  stat_summary(fun.y = mean, geom = "point", size = 2, aes(colour = site), position = position_dodge(0.5)) +
+  ylab("") +
+  xlab("") +
+  scale_color_manual(values = c("#CC79A7", "#009E73", "#D55E00", "#E69F00", "#0072B2"), name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  scale_fill_discrete(name = "Site", labels = c("Lynn", "Nahant", "Aquavitae", "West Beach", "Niles Beach")) +
+  coord_cartesian(ylim = c(0, 2)) +
+  scale_x_discrete(labels=c("Spring 2017", "Fall 2017")) +
+  theme_classic() 
+p
+
+```
+
+
 #*******************************
 #Fall 2018 Collection Planning (Impact Assessment)
 ```{r}
